@@ -1,0 +1,35 @@
+# Core API / utils
+fastapi==0.111.0
+# uvicorn==0.30.0
+python-multipart==0.0.9
+orjson==3.10.7
+redis==5.0.4
+prometheus-client==0.20.0
+requests==2.32.3
+
+# Knowledge graph + stores
+rdflib==7.0.0
+qdrant-client==1.9.0
+
+# Embeddings (CPU)
+sentence-transformers==3.0.1
+
+# PDF text extraction
+pdfminer.six==20231228
+
+# Local LLM (CPU-only)
+# llama-cpp-python==0.2.67
+
+# Task queue
+celery==5.3.6
+
+# --- API ---
+uvicorn[standard]==0.30.1
+pydantic==2.7.4
+
+# --- Worker / orchestration ---
+# redis==5.0.5
+
+# --- LLM (CPU-only llama.cpp binding) ---
+# Pin to a stable that has prebuilt wheels on manylinux; still keep toolchain ready.
+llama-cpp-python==0.2.90

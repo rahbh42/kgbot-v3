@@ -1,0 +1,17 @@
+http:
+  middlewares:
+    strip-prom:
+      stripPrefix:
+        prefixes:
+          - /prometheus
+    strip-grafana:
+      stripPrefix:
+        prefixes:
+          - /grafana
+
+  routers:
+    # (Routers for api, web, prometheus, grafana are added via labels)
+    # Example TLS config (disabled by default)
+    # If enabling TLS with certResolver, configure here.
+
+  services: {}

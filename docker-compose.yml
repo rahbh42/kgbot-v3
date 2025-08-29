@@ -1,0 +1,143 @@
+# docker-compose.yml (skeleton with fixed Fuseki)
+networks:
+  edge:
+  backend:
+
+volumes:
+  grafana-data:
+  prometheus-data:
+  fuseki-data:
+  qdrant-data:
+  ingest-data:
+
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8082:8080"
+    networks: [edge]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # ✅ Correctly nested under services:
+  fuseki:
+    image: stain/jena-fuseki:4.8.0
+    environment:
+      - ADMIN_PASSWORD=admin
+      # create dataset named "kg" at http://fuseki:3030/kg
+      - FUSEKI_DATASET=kg
+      # use TDB2 store and allow updates
+      - FUSEKI_ARGS=--tdb2 --update
+      # (optional) memory tuning
+      - JVM_ARGS=-Xms256m -Xmx1g
+    volumes:
+      # NOTE: this image persists data under /fuseki (not /fuseki-data)
+      - fuseki-data:/fuseki
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "-", "http://localhost:3030/$/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    labels:
+      - traefik.enable=false
+
+  qdrant:
+    image: qdrant/qdrant:v1.11.0
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "-", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    labels: ["traefik.enable=false"]
+
+  redis:
+    image: redis:7-alpine
+    networks: [backend]
+    labels: ["traefik.enable=false"]
+
+  api:
+    #image: kgb3-cgpt-api   # or your build block
+    build:
+       context: .
+       dockerfile: services/api/Dockerfile
+    env_file: .env
+    depends_on: [fuseki, qdrant, redis]
+    networks: [edge, backend]
+    volumes:
+      - ./models:/models:ro
+      - ingest-data:/ingest
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/docs`) || PathPrefix(`/openapi.json`)
+      - traefik.http.routers.api.entrypoints=web
+      - traefik.http.routers.api.priority=1000
+      - traefik.http.services.api.loadbalancer.server.port=8080
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    env_file: .env
+    depends_on:
+      - fuseki
+      - qdrant
+      - redis
+    networks: [backend]
+    volumes:
+      - ./models:/models:ro
+      - ingest-data:/ingest
+    labels:
+      - traefik.enable=false
+
+  web:
+    #image: kgb3-cgpt-web     # or your build block
+    build:
+      context: .
+      dockerfile: services/web/Dockerfile
+    depends_on: [api]
+    networks: [edge]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.web.rule=PathPrefix(`/`) && !PathPrefix(`/api`) && !PathPrefix(`/docs`) && !PathPrefix(`/openapi.json`)
+      - traefik.http.routers.web.entrypoints=web
+      - traefik.http.routers.web.priority=1
+      - traefik.http.services.web.loadbalancer.server.port=80
+
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks: [edge, backend]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.prom.rule=PathPrefix(`/prometheus`)
+      - traefik.http.routers.prom.entrypoints=web
+      - traefik.http.services.prom.loadbalancer.server.port=9090
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks: [edge, backend]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.grafana.rule=PathPrefix(`/grafana`)
+      - traefik.http.routers.grafana.entrypoints=web
+      - traefik.http.services.grafana.loadbalancer.server.port=3000

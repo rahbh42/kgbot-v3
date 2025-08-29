@@ -1,0 +1,7 @@
+http:
+  serversTransports:
+    api-transport:
+      forwardingTimeouts:
+        dialTimeout: 10s
+        responseHeaderTimeout: 180s
+        idleConnTimeout: 180s

@@ -1,0 +1,43 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "API Requests (total)",
+      "type": "timeseries",
+      "targets": [{ "expr": "sum(increase(api_requests_total[5m]))", "refId": "A" }],
+      "gridPos": {"h":8,"w":12,"x":0,"y":0}
+    },
+    {
+      "title": "API Latency p50/p90/p99",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(api_request_latency_seconds_bucket[5m])) by (le))", "refId": "A" },
+        { "expr": "histogram_quantile(0.9, sum(rate(api_request_latency_seconds_bucket[5m])) by (le))", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(api_request_latency_seconds_bucket[5m])) by (le))", "refId": "C" }
+      ],
+      "gridPos": {"h":8,"w":12,"x":12,"y":0}
+    },
+    {
+      "title": "Worker Jobs (total)",
+      "type": "timeseries",
+      "targets": [{ "expr": "sum(increase(worker_jobs_total[5m]))", "refId": "A" }],
+      "gridPos": {"h":8,"w":12,"x":0,"y":8}
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["kg"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "KG Overview",
+  "version": 1,
+  "weekStart": ""
+}
